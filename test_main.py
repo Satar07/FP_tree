@@ -20,3 +20,4 @@ def test_get_freq_mode():
     freq_mode = FPTree(data, min_support=3).get_freq_mode()
     assert freq_mode.get("薯片") == 7
     assert freq_mode.get("薯片,鸡蛋") == 6
+
