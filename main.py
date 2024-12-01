@@ -1,7 +1,8 @@
-from anytree import *
+from anytree import LightNodeMixin
+from collections import defaultdict
 
 
-class ItemWithSupport():
+class ItemWithSupport:
     def __init__(self, name: str, support: int):
         self.name = name
         self.support = support
@@ -15,19 +16,16 @@ def read_data(file: str) -> list[list[ItemWithSupport]]:
     with open(file, 'r', encoding="utf-8") as f:
         for line in f:
             data.append([ItemWithSupport(s, 1)
-                        for s in line.strip().split(',')])
+                         for s in line.strip().split(',')])
     return data
 
 
 def get_every_single_support(data: list[list[ItemWithSupport]]) -> dict[str, int]:
-    support = {}
+    support = defaultdict(int)
     for row in data:
         for item in row:
-            if item.name in support:
-                support[item.name] += item.support
-            else:
-                support[item.name] = item.support
-    return support
+            support[item.name] += item.support
+    return dict(support)
 
 
 class FPNode(LightNodeMixin):
@@ -38,14 +36,12 @@ class FPNode(LightNodeMixin):
         self.name = name
         self.value = value
         self.parent = parent
-        if children:
-            self.children = children
+        self.children = children if children is not None else []  # Ensure it's always a list
 
 
-class FPTree():
-
+class FPTree:
     def __init__(self, data: list[list[ItemWithSupport]], min_support: int):
-        self.m_item_to_node = {}
+        self.m_item_to_node = defaultdict(list)
         self.m_min_support = min_support
         self.m_item_support = get_every_single_support(data)
         self.m_freq_one_item = [
@@ -62,23 +58,22 @@ class FPTree():
                 reverse=True
             )
             sorted_data.append(sorted_row)
+
         for row in sorted_data:
             self.insert(row, self.root)
 
     def insert(self, items: list[ItemWithSupport], node: FPNode):
         if not items:
             return
-        for child in node.children:
-            if child.name == items[0].name:
-                child.value += items[0].support
-                self.insert(items[1:], node=child)
-                return
-        new_node = FPNode(items[0].name, items[0].support, parent=node)
-        if items[0].name not in self.m_item_to_node:
-            self.m_item_to_node[items[0].name] = [new_node]
+        child_node = next(
+            (child for child in node.children if child.name == items[0].name), None)
+        if child_node:
+            child_node.value += items[0].support
+            self.insert(items[1:], child_node)
         else:
+            new_node = FPNode(items[0].name, items[0].support, parent=node)
             self.m_item_to_node[items[0].name].append(new_node)
-        self.insert(items[1:], new_node)
+            self.insert(items[1:], new_node)
 
     def get_conditional_tree(self, item: str) -> 'FPTree':
         data = []
@@ -90,19 +85,16 @@ class FPTree():
                 path.append(ItemWithSupport(parent.name, first_support))
                 parent = parent.parent
             if path:
-                data.append(path[::-1])  # 逆序路径
+                data.append(path[::-1])  # Reverse path order
         return FPTree(data, self.m_min_support)
 
     def get_freq_mode(self) -> dict[str, int]:
         freq_mode = {}
-        # print the tree
-        print(RenderTree(self.root).by_attr())
         for item in self.m_freq_one_item[::-1]:
-            # dig the mode of item in freq_one_item_set
             freq_mode[item] = self.m_item_support[item]
             con_tree = self.get_conditional_tree(item)
             sub_freq_mode = con_tree.get_freq_mode()
-            # merge
-            for (sub_item, sub_support) in sub_freq_mode.items():
-                freq_mode[sub_item+','+item] = sub_support
+            for sub_item, sub_support in sub_freq_mode.items():
+                combined_item = sub_item + ',' + item
+                freq_mode[combined_item] = sub_support
         return freq_mode
