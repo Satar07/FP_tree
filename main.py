@@ -43,19 +43,16 @@ class FPNode(LightNodeMixin):
 
 
 class FPTree():
-    root = None
-    m_freq_one_item = []
-    m_item_to_node = {}
-    m_min_support = 0
-    m_item_support = {}
 
     def __init__(self, data: list[list[ItemWithSupport]], min_support: int):
+        self.m_item_to_node = {}
         self.m_min_support = min_support
         self.m_item_support = get_every_single_support(data)
         self.m_freq_one_item = [
             item for item in self.m_item_support if self.m_item_support[item] >= min_support]
         self.m_freq_one_item.sort(
             key=lambda x: self.m_item_support[x], reverse=True)
+        self.root = FPNode("root", 0)
 
         sorted_data = []
         for row in data:
@@ -65,8 +62,6 @@ class FPTree():
                 reverse=True
             )
             sorted_data.append(sorted_row)
-
-        self.root = FPNode("root", 0)
         for row in sorted_data:
             self.insert(row, self.root)
 
@@ -90,25 +85,24 @@ class FPTree():
         for node in self.m_item_to_node[item]:
             path = []
             first_support = node.value
-            if node.parent.name == "root":
-                continue
-            node = node.parent # skip the item itself
-            while node.parent.name != "root":
-                path.append(ItemWithSupport(node.name, first_support))
-                node = node.parent
-            data.append(path)
+            parent = node.parent
+            while parent.name != "root":
+                path.append(ItemWithSupport(parent.name, first_support))
+                parent = parent.parent
+            if path:
+                data.append(path[::-1])  # 逆序路径
         return FPTree(data, self.m_min_support)
 
-    def get_freq_mode(self) -> dict[str,int]:
+    def get_freq_mode(self) -> dict[str, int]:
         freq_mode = {}
+        # print the tree
+        print(RenderTree(self.root).by_attr())
         for item in self.m_freq_one_item[::-1]:
             # dig the mode of item in freq_one_item_set
-            freq_mode[item]=self.m_item_support[item]
+            freq_mode[item] = self.m_item_support[item]
             con_tree = self.get_conditional_tree(item)
-            sub_freq_mode  = con_tree.get_freq_mode()
+            sub_freq_mode = con_tree.get_freq_mode()
             # merge
-            for (sub_item,sub_support) in sub_freq_mode.items():
+            for (sub_item, sub_support) in sub_freq_mode.items():
                 freq_mode[sub_item+','+item] = sub_support
         return freq_mode
-        
-                
